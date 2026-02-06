@@ -23,70 +23,55 @@ public class Level3 {
             reader.nextLine();
 
             int absPos = Math.abs(pos);
-            int acc = absPos / 2;
 
             var paces = new ArrayList<Integer>();
 
             paces.add(0);
-            if(absPos == 2) {
-                paces.add((int) Math.signum(pos) * 5);
-                paces.add((int) Math.signum(pos) * 5);
-            } else {
-                int pace = 0;
-                int breakPoint = 0;
-                for (int i = 0; i < absPos; i++) {
-                    pace = accelerate(pace, (int) Math.signum(pos));
-                    paces.add(pace);
+            int pace = 0;
+            while(absPos > 0) {
+                int brakePath = pace == 0 ? 0 : 5 - pace + 1;
 
-                    breakPoint = absPos - (5 - Math.abs(pace));
-                    if (i >= breakPoint - 1) {
-                        break;
-                    }
+                if(brakePath == absPos) {
+                    //nothing
+                } else if(brakePath > absPos) {
+                    pace = decelerate(pace);
+                } else {
+                    pace = accelerate(pace);
                 }
+                paces.add(pace);
 
-                for (int i = breakPoint; i < absPos; i++) {
-                    pace = decelerate(pace, (int) Math.signum(pos));
-                    paces.add(pace);
-                }
+                absPos--;
             }
             paces.add(0);
 
             for(var a : paces) {
+                if(pos < 0) {
+                    a *= -1;
+                }
+
                 writer.write(a + " ");
             }
             writer.write("\n");
         }
     }
 
-    private static int accelerate(int prevPace, int sign) {
+    private static int accelerate(int prevPace) {
         if(prevPace == 0) {
-            return sign * 5;
-        } else if(Math.abs(prevPace) == 1) {
-            return sign * 1;
+            return 5;
+        } else if(prevPace == 1) {
+            return 1;
         }
 
-        return prevPace + (sign * -1);
+        return prevPace - 1;
     }
 
-    private static int decelerate(int prevPace, int sign) {
-        int paceAbs = Math.abs(prevPace);
-
+    private static int decelerate(int prevPace) {
         if(prevPace == 0) {
             return 0;
-        } else if(Math.abs(prevPace) == 5) {
+        } else if(prevPace == 5) {
             return 0;
         }
 
-        return prevPace + (sign);
-    }
-
-    private static int paceToSpace(int pace) {
-        return (int) Math.signum(pace);
-    }
-
-    private static int paceToTime(int pace) {
-        if(pace == 0) return 1;
-
-        return Math.abs(pace);
+        return prevPace + 1;
     }
 }
