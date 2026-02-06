@@ -32,7 +32,7 @@
         <headless>true</headless>
 
         <!-- Specifies the input path of the visualizer file -->
-        <visualizerPath>./input/visualizer.html</visualizerPath>
+        <visualizerPath>./input/spaceship/level4/visualizer.html</visualizerPath>
 
         <elementLocators>
             <!-- The HTML input locator of the visualizer  -->
