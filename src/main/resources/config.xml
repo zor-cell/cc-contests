@@ -2,7 +2,7 @@
     <!-- Solver configuration -->
     <solver>
         <!-- Specifies the directory path where input files are located -->
-        <inputPath>./input/spaceship/level3</inputPath>
+        <inputPath>./input/spaceship/level4</inputPath>
 
         <!-- Specifies the directory path where output files should be placed -->
         <outputPath>./output/</outputPath>
@@ -26,7 +26,7 @@
     <!-- Verifier configuration -->
     <verifier>
         <!-- A boolean value indicating whether the verifier should be used -->
-        <enabled>false</enabled>
+        <enabled>true</enabled>
 
         <!-- A boolean value indicating whether the running verifier is headless-->
         <headless>true</headless>
