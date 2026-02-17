@@ -5,22 +5,25 @@ import config.ConfigLoader;
 import io.IOManager;
 import io.IOUtils;
 import log.CustomLogger;
+import org.slf4j.event.Level;
 import solver.spaceship.*;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Logger;
 
 public class Solver {
     private static Logger log;
+    private static Config config;
 
     /**
      * Do not change this method. Method Loads the config and initializes the IOManager.
      */
     public static void main(String[] args) {
-        Config config = ConfigLoader.loadConfig("config.xml");
+        config = ConfigLoader.loadConfig("config.xml");
 
         CustomLogger.createLogger(config);
         log = CustomLogger.getLogger();
@@ -61,6 +64,47 @@ public class Solver {
      * DO NOT CHANGE PARAMETERS OR RETURN TYPE
      */
     public static void solve(Scanner reader, FileWriter writer) throws IOException {
-        Level5.solve(reader, writer);
+        String className = parseClassName(config.inputPath());
+
+        try {
+            Class<?> clazz = Class.forName(className);
+            Method method = clazz.getMethod("solve", Scanner.class, FileWriter.class);
+            method.invoke(null, reader, writer);
+        } catch(Exception e) {
+            log.severe("Could not execute class: " + className);
+        }
+    }
+
+    private static String parseClassName(String path) {
+        String cleaned = path.replace("\\", "/");
+
+        if (cleaned.startsWith("./")) {
+            cleaned = cleaned.substring(2);
+        }
+
+        if (cleaned.startsWith("input/")) {
+            cleaned = cleaned.substring("input/".length());
+        }
+
+        String packagePart = "";
+        String classPart = cleaned;
+
+        //separate package and class part
+        int lastSlashIndex = cleaned.lastIndexOf('/');
+        if (lastSlashIndex != -1) {
+            packagePart = cleaned.substring(0, lastSlashIndex).replace("/", ".");
+            classPart = cleaned.substring(lastSlashIndex + 1);
+        }
+
+        //capitalize class name
+        if (!classPart.isEmpty()) {
+            classPart = Character.toUpperCase(classPart.charAt(0)) + classPart.substring(1);
+        }
+
+        if (!packagePart.isEmpty()) {
+            return "solver." + packagePart + "." + classPart;
+        } else {
+            return "solver." + classPart;
+        }
     }
 }
