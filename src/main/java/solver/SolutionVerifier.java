@@ -68,7 +68,7 @@ public class SolutionVerifier {
             }
 
             if(!resultText.contains("SUCCESS")) {
-                writer.write(String.format("Validation run %d exited with %s! Additional Info: '%s' | Input: %s | Output: %s\n", run, resultText, infoText, inputContent, outputContent));
+                writer.write(String.format("Validation run %d exited with %s! Additional Info: '%s' | Input: %s | Output: %s\n", run, resultText, infoText, inputContent.replace("\n", " "), outputContent.replace("\n", " ")));
             }
         } catch (Exception e) {
            log.severe("Visualizer failed");

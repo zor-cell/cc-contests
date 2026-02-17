@@ -5,10 +5,7 @@ import config.ConfigLoader;
 import io.IOManager;
 import io.IOUtils;
 import log.CustomLogger;
-import solver.spaceship.Level1;
-import solver.spaceship.Level2;
-import solver.spaceship.Level3;
-import solver.spaceship.Level4;
+import solver.spaceship.*;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -43,11 +40,14 @@ public class Solver {
         input.nextLine(); //skip linebreak
 
         for(int run = 0;run < maxRuns;run++) {
-            String inputLine = input.nextLine();
+            String inputLine1 = input.nextLine();
+            String inputLine2 = input.nextLine();
+
             String xPath = output.nextLine();
             String yPath = output.nextLine();
             output.nextLine();
 
+            String inputLine = inputLine1 + "\n" + inputLine2;
             String paths = xPath + "\n" + yPath;
 
             verifier.checkValidity(run, inputLine, paths);
@@ -61,6 +61,6 @@ public class Solver {
      * DO NOT CHANGE PARAMETERS OR RETURN TYPE
      */
     public static void solve(Scanner reader, FileWriter writer) throws IOException {
-        Level4.solve(reader, writer);
+        Level5.solve(reader, writer);
     }
 }
