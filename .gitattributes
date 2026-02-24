@@ -1,2 +1,2 @@
-input/* linguist-vendored
-output/* linguist-vendored
+input/** linguist-vendored
+output/** linguist-vendored
