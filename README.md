@@ -15,9 +15,6 @@ single contest; this one collects everything that has been solved with it.
 | `roomplanner` (40th CCC) | 1–7 | Fill storage rooms with desks: count how many fit, then place them — later with other and mixed desk sizes. | [`solver/roomplanner`](src/main/java/solver/roomplanner) |
 | `spaceship` (41st CCC) | 1–8 | Steer a spaceship with sequences of paces to a space station within a time limit, later around stationary and moving asteroids. | [`solver/spaceship`](src/main/java/solver/spaceship) |
 
-Every level builds on the previous one, so later levels reuse the helper classes of their contest
-(`PathFinder`, `Asteroid`, ...).
-
 ## Running a level
 
 Requires JDK 21 and Maven. Always run from the repository root.
