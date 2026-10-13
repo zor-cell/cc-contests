@@ -24,7 +24,7 @@ public class Level5 {
             int limit = Integer.parseInt(split[1]);
 
             String aLine = reader.nextLine();
-            Point a = new Point(aLine);
+            Asteroid a = new Asteroid(aLine);
 
             var path = PathFinder.findPath(s, limit, List.of(a));
             if(path == null) {

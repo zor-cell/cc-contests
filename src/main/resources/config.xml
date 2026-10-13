@@ -2,7 +2,7 @@
     <!-- Solver configuration -->
     <solver>
         <!-- Specifies the directory path where input files are located -->
-        <inputPath>./input/spaceship/level7</inputPath>
+        <inputPath>./input/spaceship/level8</inputPath>
 
         <!-- Specifies the directory path where output files should be placed -->
         <outputPath>./output/</outputPath>

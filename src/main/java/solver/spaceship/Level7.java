@@ -24,9 +24,9 @@ public class Level7 {
 
             int asteroidCount = Integer.parseInt(reader.nextLine().trim());
             String[] aSplit = reader.nextLine().trim().split(" ");
-            var asteroids = new ArrayList<Point>();
+            var asteroids = new ArrayList<Asteroid>();
             for(int i = 0;i < asteroidCount;i++) {
-                asteroids.add(new Point(aSplit[i]));
+                asteroids.add(new Asteroid(aSplit[i]));
             }
 
             long start = System.currentTimeMillis();

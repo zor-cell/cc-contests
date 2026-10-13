@@ -11,12 +11,15 @@ import java.util.List;
  * Every edge is one tick. The heuristic is the maximum of the exact remaining time of each axis without asteroids
  * and the number of cells to the station around the asteroids (an axis moves at most one cell per tick).
  * Nodes that cannot reach the station within the time limit are dropped, so every path found respects the limit.
+ * As soon as one asteroid moves, the blocked cells depend on the tick and the tick becomes part of the node.
  */
 public class PathFinder {
     private static final int MIN_PACE = 5;
     private static final int COLLISION_AREA = 2;
     //how far the ship may leave the bounding box of start, station and asteroids
     private static final int MARGIN = 10;
+    //moving asteroids come from everywhere: how far the ship may leave the bounding box of start and station
+    private static final int MOVING_MARGIN = 30;
     //weight of the heuristic: 1 finds the fastest path, higher values find a slower path much quicker
     private static final int WEIGHT = 2;
     private static final int INF = Integer.MAX_VALUE / 2;
@@ -66,8 +69,11 @@ public class PathFinder {
     private final int minY;
     private final int width;
     private final int height;
+    private final int cells;
+    private final boolean moving;
+    //blocked cells, with moving asteroids one layer of cells per tick
     private final boolean[] blocked;
-    //cells to the station around the blocked cells, moving in all 8 directions
+    //cells to the station around the blocked cells, moving in all 8 directions (0 with moving asteroids)
     private final int[] cellDistance;
 
     //nodes
@@ -85,28 +91,36 @@ public class PathFinder {
     private final int[] bucketSizes;
     private int lowestBucket = 0;
 
-    private PathFinder(Point goal, int limit, List<Point> asteroids) {
+    private PathFinder(Point goal, int limit, List<Asteroid> asteroids) {
         this.goal = goal;
         this.limit = limit;
 
-        int[] box = boundingBox(goal, asteroids);
-        minX = box[0] - MARGIN;
-        minY = box[1] - MARGIN;
-        width = box[2] - box[0] + 2 * MARGIN + 1;
-        height = box[3] - box[1] + 2 * MARGIN + 1;
+        int[] box = searchBox(goal, asteroids);
+        minX = box[0];
+        minY = box[1];
+        width = box[2] - box[0] + 1;
+        height = box[3] - box[1] + 1;
+        cells = width * height;
+        moving = asteroids.stream().anyMatch(Asteroid::isMoving);
 
-        blocked = new boolean[width * height];
-        for(var asteroid : asteroids) {
-            for(int x = asteroid.x - COLLISION_AREA;x <= asteroid.x + COLLISION_AREA;x++) {
-                for(int y = asteroid.y - COLLISION_AREA;y <= asteroid.y + COLLISION_AREA;y++) {
-                    if(inside(x, y)) {
-                        blocked[cell(x, y)] = true;
+        int layers = moving ? limit + 1 : 1;
+        blocked = new boolean[layers * cells];
+        for(int time = 0;time < layers;time++) {
+            for(var asteroid : asteroids) {
+                int asteroidX = asteroid.xAt(time);
+                int asteroidY = asteroid.yAt(time);
+
+                for(int x = asteroidX - COLLISION_AREA;x <= asteroidX + COLLISION_AREA;x++) {
+                    for(int y = asteroidY - COLLISION_AREA;y <= asteroidY + COLLISION_AREA;y++) {
+                        if(inside(x, y)) {
+                            blocked[time * cells + cell(x, y)] = true;
+                        }
                     }
                 }
             }
         }
 
-        cellDistance = cellDistances();
+        cellDistance = moving ? new int[cells] : cellDistances();
 
         buckets = new int[WEIGHT * limit + 1][16];
         bucketSizes = new int[WEIGHT * limit + 1];
@@ -114,28 +128,34 @@ public class PathFinder {
     }
 
     /**
-     * @return {minX, minY, maxX, maxY} of start, station and asteroids
+     * @return {minX, minY, maxX, maxY} of the cells the ship may use
      */
-    private static int[] boundingBox(Point goal, List<Point> asteroids) {
+    private static int[] searchBox(Point goal, List<Asteroid> asteroids) {
         int[] box = {Math.min(0, goal.x), Math.min(0, goal.y), Math.max(0, goal.x), Math.max(0, goal.y)};
-        for(var asteroid : asteroids) {
-            box[0] = Math.min(box[0], asteroid.x);
-            box[1] = Math.min(box[1], asteroid.y);
-            box[2] = Math.max(box[2], asteroid.x);
-            box[3] = Math.max(box[3], asteroid.y);
+        int margin = MOVING_MARGIN;
+
+        if(asteroids.stream().noneMatch(Asteroid::isMoving)) {
+            //a way around stationary asteroids never has to leave the asteroid field by much
+            margin = MARGIN;
+            for(var asteroid : asteroids) {
+                box[0] = Math.min(box[0], asteroid.x);
+                box[1] = Math.min(box[1], asteroid.y);
+                box[2] = Math.max(box[2], asteroid.x);
+                box[3] = Math.max(box[3], asteroid.y);
+            }
         }
 
-        return box;
+        return new int[]{box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin};
     }
 
     private int[] cellDistances() {
-        int[] distances = new int[width * height];
+        int[] distances = new int[cells];
         Arrays.fill(distances, INF);
         if(blocked[cell(goal.x, goal.y)]) {
             return distances;
         }
 
-        int[] queue = new int[width * height];
+        int[] queue = new int[cells];
         int head = 0;
         int tail = 0;
         queue[tail++] = cell(goal.x, goal.y);
@@ -167,20 +187,20 @@ public class PathFinder {
     /**
      * @return a collision free path to {@code goal} within {@code limit}, or null if there is none
      */
-    public static TotalPath findPath(Point goal, int limit, List<Point> asteroids) {
-        int[] box = boundingBox(goal, asteroids);
-        ensureMinTime(Math.max(box[2] - box[0], box[3] - box[1]) + 2 * MARGIN);
+    public static TotalPath findPath(Point goal, int limit, List<Asteroid> asteroids) {
+        int[] box = searchBox(goal, asteroids);
+        ensureMinTime(Math.max(box[2] - box[0], box[3] - box[1]));
 
         return new PathFinder(goal, limit, asteroids).search();
     }
 
     private TotalPath search() {
-        if(blocked[cell(0, 0)]) {
+        if(limit < 1 || isBlocked(0, 0, 0) || isBlocked(0, 0, 1)) {
             return null;
         }
 
         //both sequences have to start with pace 0, which takes the first tick
-        push(key(0, 0, STOPPED, STOPPED), -1, 1);
+        push(key(0, 0, STOPPED, STOPPED, 1), -1, 1);
 
         while(lowestBucket < buckets.length) {
             if(bucketSizes[lowestBucket] == 0) {
@@ -196,9 +216,10 @@ public class PathFinder {
 
             int yState = (int) (key % STATE_COUNT);
             int xState = (int) (key / STATE_COUNT % STATE_COUNT);
-            int cell = (int) (key / (STATE_COUNT * STATE_COUNT));
+            int cell = (int) (key / (STATE_COUNT * STATE_COUNT) % cells);
             int x = cell / height + minX;
             int y = cell % height + minY;
+            int nextTime = nodeTime[node] + 1;
 
             if(x == goal.x && y == goal.y && xState == STOPPED && yState == STOPPED) {
                 return buildPath(node);
@@ -210,8 +231,8 @@ public class PathFinder {
                 for(int j = 0;j < NEXT[yState].length;j++) {
                     int nextY = y + MOVE[yState][j];
 
-                    if(inside(nextX, nextY) && !blocked[cell(nextX, nextY)]) {
-                        push(key(nextX, nextY, NEXT[xState][i], NEXT[yState][j]), node, nodeTime[node] + 1);
+                    if(inside(nextX, nextY) && !isBlocked(nextX, nextY, nextTime)) {
+                        push(key(nextX, nextY, NEXT[xState][i], NEXT[yState][j], nextTime), node, nextTime);
                     }
                 }
             }
@@ -223,7 +244,7 @@ public class PathFinder {
     private void push(long key, int parent, int time) {
         int yState = (int) (key % STATE_COUNT);
         int xState = (int) (key / STATE_COUNT % STATE_COUNT);
-        int cell = (int) (key / (STATE_COUNT * STATE_COUNT));
+        int cell = (int) (key / (STATE_COUNT * STATE_COUNT) % cells);
 
         int xTime = minTime[xState][goal.x - (cell / height + minX) + range];
         int yTime = minTime[yState][goal.y - (cell % height + minY) + range];
@@ -325,8 +346,16 @@ public class PathFinder {
         return paces;
     }
 
-    private long key(int x, int y, int xState, int yState) {
-        return ((long) cell(x, y) * STATE_COUNT + xState) * STATE_COUNT + yState;
+    private long key(int x, int y, int xState, int yState, int time) {
+        return (((long) layer(time) * cells + cell(x, y)) * STATE_COUNT + xState) * STATE_COUNT + yState;
+    }
+
+    private boolean isBlocked(int x, int y, int time) {
+        return blocked[layer(time) * cells + cell(x, y)];
+    }
+
+    private int layer(int time) {
+        return moving ? time : 0;
     }
 
     private int cell(int x, int y) {
