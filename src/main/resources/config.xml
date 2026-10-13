@@ -2,10 +2,10 @@
     <!-- Solver configuration -->
     <solver>
         <!-- Specifies the directory path where input files are located -->
-        <inputPath>./input/spaceship/level8</inputPath>
+        <inputPath>./input/spaceship/level7</inputPath>
 
         <!-- Specifies the directory path where output files should be placed. It is created if it does not exist -->
-        <outputPath>./output/</outputPath>
+        <outputPath>C:/Users/Zorman/AppData/Local/Temp/claude/C--Users-Zorman-Zorman-Privat-Programme-GitHub-cc-input-reader/5ab6dc97-56e9-409f-a173-8bed64379716/scratchpad/contests-ver-out</outputPath>
 
         <!-- (Optional) Specifies a directory to which every non-empty output file is copied after solving. It is never cleaned up and keeps the folder structure below the top level input folder (./input/contest/level1/in_x.txt results in <solutionPath>/contest/level1/out_x.txt) -->
         <solutionPath>./solutions/</solutionPath>
@@ -29,13 +29,16 @@
     <!-- Verifier configuration -->
     <verifier>
         <!-- A boolean value indicating whether the verifier should be used -->
-        <enabled>false</enabled>
+        <enabled>true</enabled>
 
         <!-- A boolean value indicating whether the running verifier is headless-->
         <headless>true</headless>
 
+        <!-- (Optional) A boolean value indicating whether only test cases that are not valid are written to the .ver files. An empty .ver file then means that every test case is valid -->
+        <onlyFailures>false</onlyFailures>
+
         <!-- Specifies the input path of the visualizer file -->
-        <visualizerPath>./input/spaceship/level4/visualizer.html</visualizerPath>
+        <visualizerPath>./input/spaceship/level7/sandbox-level-7.html</visualizerPath>
 
         <elementLocators>
             <!-- The HTML input locator of the visualizer  -->
