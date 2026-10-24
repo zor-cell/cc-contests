@@ -1,0 +1,151 @@
+# CLAUDE.md
+
+Collection of solved [Cloudflight Coding Contest (CCC)](https://codingcontest.org) levels, one folder per
+contest. The framework handles file discovery, input/output files and (optionally) checking solutions against
+the contest's HTML visualizer. `Solver.solve()` / `Solver.verify()` dispatch by reflection to
+`solver.<contest>.LevelN`, derived from `<inputPath>` in `config.xml` (`./input/spaceship/level8` →
+`solver.spaceship.Level8`). A new level means a new `LevelN` class, not a change to `Solver.java`.
+
+## CCC format (typical — the level statement always wins)
+
+- A contest runs ~4 hours and consists of sequential **levels** (usually 5–7). Each level extends the previous
+  one: same story, more rules, bigger inputs. Keep the solver code reusable across levels.
+- Each level comes with a **statement** (PDF/web page) and a **zip of input files**:
+  `levelN_example.in`, `levelN_example.out` (expected output for the example) and `levelN_1.in` … `levelN_5.in`.
+  Newer contests name them `in_level-N_0-example.txt`, `out_level-N_0-example.txt` (expected output) and
+  `in_level-N_1-small.txt` … `in_level-N_k-large.txt`, often with a `sandbox-level-N.html` visualizer. Both
+  schemes are picked up; `out_*` files are never treated as input.
+- For every `levelN_k.in` an output file is uploaded to the contest platform, which answers valid/invalid
+  immediately. All files of a level must be accepted to unlock the next level; usually the source code is
+  uploaded as well.
+- Input files usually start with a count (number of test cases, or dimensions) followed by the cases. Output is
+  usually one line per case, in later levels sometimes several lines per case.
+- Later levels often accept **any valid** solution (paths, placements, schedules), so `levelN_example.out` is
+  then just one possible answer and a plain diff proves nothing. Some contests ship a `visualizer.html` that
+  validates a solution for exactly this reason.
+- The statement is provided by the user (PDF or pasted text). If it is missing, ask for it — do not infer the
+  task from the input files alone.
+
+## Layout
+
+| Path | Purpose |
+| --- | --- |
+| `src/main/java/solver/Solver.java` | Dispatches `solve()` / `verify()` to the level class. Do not change `main` or the method signatures. |
+| `src/main/java/solver/<contest>/LevelN.java` | `public static void solve(Scanner, FileWriter)` and optionally `verify(Scanner, Scanner, SolutionVerifier)`. Shared helpers of a contest live in the same package. |
+| `src/main/resources/config.xml` | Paths, level filter, log level, verifier settings. |
+| `src/main/java/io/IOUtils.java` | `readList` (one line → list), `readGrid` (height lines → 2D list). Delimiter is a **regex**. |
+| `src/main/java/io/IOManager.java` | Finds input files, creates output files, calls `solve`/`verify` per file. |
+| `src/main/java/solver/SolutionVerifier.java` | Selenium/Chrome driver around the visualizer. |
+| `input/<contest>/levelN/` | Unzipped level files: statement PDF, inputs, expected example output, visualizer HTML. |
+| `output/` | `<input basename>.txt` per input file (a leading `in_` becomes `out_`), plus `<basename>.ver` when the verifier is on. Scratch: created if missing, wiped on every run. |
+| `solutions/` | Only if `<solutionPath>` is set: a copy of every non-empty output file, in the same sub-folders as below `input/` (`input/contest/level1/` → `solutions/contest/level1/`). Never cleaned, meant to be committed. |
+
+`solutions/` holds the accepted (for optimization levels: the best known) outputs. A run overwrites them — see
+Gotchas.
+
+## Run
+
+Always from the repo root (paths in `config.xml` are relative to the working directory):
+
+```bash
+mvn -q compile exec:java
+```
+
+`config.xml` is read from the classpath, so it only takes effect after `mvn compile` — the command above covers
+that. Requires JDK 21 and Maven.
+
+## Workflow per level
+
+1. Unzip the level into `input/<contest>/levelN/` and set `<inputPath>` to that folder (no trailing slash).
+2. Read the statement and the example input / output, then create `solver/<contest>/LevelN.java` with `solve()`.
+3. Set `<targetSpecificLevel>Ne</targetSpecificLevel>` (example only) and run.
+4. Compare with the expected example output:
+   ```bash
+   diff --strip-trailing-cr output/levelN_example.txt input/<contest>/levelN/levelN_example.out
+   ```
+   With the newer naming both files are called `out_level-N_0-example.txt`:
+   ```bash
+   diff --strip-trailing-cr output/out_level-N_0-example.txt input/<contest>/levelN/out_level-N_0-example.txt
+   ```
+   No output means identical. If the level accepts multiple valid answers, use the visualizer instead (below).
+5. Set `<targetSpecificLevel>N</targetSpecificLevel>`, run, and sanity-check the outputs (line count matches the
+   number of cases, no empty files). The user uploads `output/levelN_*.txt`.
+
+`targetSpecificLevel`: `N` = all files of level N, `Ne` = only its example, `e` = all examples, `-1` = everything.
+
+## Verifying with a visualizer HTML
+
+`SolutionVerifier` opens the HTML in headless Chrome, puts one test case into the input textarea and its
+solution into the output textarea, then reads the status element. Setup for a new contest:
+
+1. Set `<visualizerPath>` to the level's HTML (`input/<contest>/levelN/sandbox-level-N.html` or `visualizer.html`).
+2. Find the element ids and adjust `<elementLocators>` (CSS selector, or XPath if it starts with `//`):
+   ```bash
+   grep -n -o -E '<(textarea|input|span|div|strong)[^>]*id="[^"]*"' input/<contest>/levelN/sandbox-level-N.html
+   ```
+   Needed: input field, solution field, status element; optional: info/message element.
+3. Read the validation code in the HTML's `<script>`. It tells you
+   - what the page expects as input — normally **one test case**, not the whole `.in` file,
+   - the status strings (`SUCCESS` / `FAILURE` in the sample),
+   - when validation runs. It must run on the `input` event of the input or the solution field; a visualizer
+     that needs a button click is not supported by `SolutionVerifier` as is.
+
+   This script is also the most precise spec of what counts as a valid solution — read it when the statement
+   is ambiguous.
+4. Add a `public static void verify(Scanner input, Scanner output, SolutionVerifier verifier)` to the level class
+   (without one, `Solver.verify()` falls back to a default that matches the later spaceship levels). It slices
+   the input file and the output file per test case and calls `verifier.checkValidity(run, inputCase,
+   outputCase)`. Multi-line cases are joined with `\n`:
+   ```java
+   for (int run = 0; run < maxRuns; run++) {
+       String inputCase = input.nextLine() + "\n" + input.nextLine();
+       String outputCase = output.nextLine() + "\n" + output.nextLine();
+       verifier.checkValidity(run, inputCase, outputCase);
+   }
+   ```
+5. Set `<enabled>true</enabled>`, run, and check the result files:
+   ```bash
+   grep -c "exited with SUCCESS" output/*.ver
+   grep "exited with FAILURE" output/*.ver
+   ```
+   Each case produces one entry `Validation run <i> exited with <status>! Additional Info: '<message>' | ...`.
+   If the page sets no status within 5 s the entry says `exited with TIMEOUT`, and a case whose check threw
+   (console shows `SEVERE: Visualizer failed`) says `exited with ERROR`. The SUCCESS count must equal the
+   number of cases.
+
+   With `<onlyFailures>true</onlyFailures>` entries whose status is exactly `SUCCESS` are left out, so an
+   empty `.ver` file means that every case is valid. List the files that still contain something:
+   ```bash
+   find output -name "*.ver" -size +0
+   ```
+
+Verifier limits:
+
+- Chrome must be installed; the first run downloads a matching chromedriver (needs internet, ~8 s startup).
+- The page is loaded once per input file and reused for all of its cases. Both fields are set through
+  `JavascriptExecutor` and get one `input` event each, so the page validates twice per case regardless of the
+  text length (CCC 41 level 8: 100 cases with 670 000 characters in ~8 s). A single validation may take up to
+  3 minutes before the case is aborted.
+- Since the page is not reloaded between cases, a visualizer that keeps state apart from the two fields can
+  carry it over to the next case.
+- Set `<headless>false</headless>` to watch the visualizer while debugging.
+
+## Gotchas
+
+- After `reader.nextInt()` call `reader.nextLine()` before reading whole lines.
+- `IOUtils.readList` does not trim: leading or double spaces produce empty tokens (`NumberFormatException`).
+  Use `"\\s+"` as delimiter when the spacing is irregular. `readGrid(reader, "", w, h, ...)` splits a line into
+  single characters.
+- Only `IOException` is caught around `solve()`. Any other exception aborts the whole run: later files get no
+  output, and with the verifier enabled the Chrome process stays open.
+- `<cleanupOutput>true</cleanupOutput>` deletes everything inside `outputPath` on every run, recursively.
+  Never point `outputPath` at a directory with anything worth keeping; outputs that should survive go to
+  `<solutionPath>`.
+- `<solutionPath>` is overwritten by **every** run, including runs of a half-finished solver — check
+  `git diff` before committing. The sub-folder is taken relative to the first folder of `inputPath`.
+- The level filter looks for `levelN` / `level-N` / `level_N` in the **file name** (not the folder) and does not
+  match longer numbers (`1` skips `level10_*`). The example filter is a plain substring match on `example`.
+- Output files are named by input basename only; two inputs with the same name in different folders overwrite
+  each other.
+- Debug output: `log.fine(...)` in `solve()` plus `<logLevel>FINE</logLevel>`; `FINER` also lists the files found.
+- Sums and products in later levels overflow `int` quickly — default to `long`.
